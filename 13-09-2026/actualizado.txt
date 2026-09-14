@@ -213,6 +213,7 @@ CREATE TABLE pedidos_cliente (
     confirmado_por INT DEFAULT NULL,
     fecha_confirmacion TIMESTAMP NULL DEFAULT NULL,
     motivo_rechazo VARCHAR(255) DEFAULT NULL,
+    venta_id INT DEFAULT NULL,
     observaciones TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -228,7 +229,8 @@ CREATE TABLE pedidos_cliente (
     INDEX idx_pedidos_cliente_metodo (metodo_pago),
     INDEX idx_pedidos_cliente_tipo (tipo_entrega),
     INDEX idx_pedidos_cliente_transf (tipo_transferencia),
-    INDEX idx_pedidos_cliente_confirmado_por (confirmado_por)
+    INDEX idx_pedidos_cliente_confirmado_por (confirmado_por),
+    INDEX idx_pedidos_cliente_venta (venta_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
@@ -237,6 +239,7 @@ CREATE TABLE pedidos_cliente (
 CREATE TABLE ventas (
     id INT PRIMARY KEY AUTO_INCREMENT,
     pedido_id INT DEFAULT NULL,
+    pedido_cliente_id INT DEFAULT NULL,
     usuario_id INT NOT NULL,
     mesa_id INT DEFAULT NULL,
     cliente_id INT DEFAULT NULL,
@@ -249,6 +252,7 @@ CREATE TABLE ventas (
     metodo_pago ENUM('efectivo', 'tarjeta', 'yape', 'plin', 'transferencia') NOT NULL,
     numero_operacion VARCHAR(50) DEFAULT NULL,
     tipo_entrega ENUM('local', 'delivery', 'paraLlevar', 'motorizada') DEFAULT 'local',
+    origen ENUM('mesero', 'cajero', 'admin', 'pedido_web') DEFAULT 'mesero',
     estado ENUM('completada', 'cancelada', 'pendiente') DEFAULT 'completada',
     observaciones TEXT DEFAULT NULL,
     fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -257,17 +261,20 @@ CREATE TABLE ventas (
     deleted_at TIMESTAMP NULL DEFAULT NULL,
 
     FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE SET NULL,
+    FOREIGN KEY (pedido_cliente_id) REFERENCES pedidos_cliente(id) ON DELETE SET NULL,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
     FOREIGN KEY (mesa_id) REFERENCES mesas(id) ON DELETE SET NULL,
     FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL,
 
     INDEX idx_ventas_usuario (usuario_id),
     INDEX idx_ventas_pedido (pedido_id),
+    INDEX idx_ventas_pedido_cliente (pedido_cliente_id),
     INDEX idx_ventas_mesa (mesa_id),
     INDEX idx_ventas_cliente (cliente_id),
     INDEX idx_ventas_fecha (fecha_venta),
     INDEX idx_ventas_metodo_pago (metodo_pago),
     INDEX idx_ventas_estado (estado),
+    INDEX idx_ventas_origen (origen),
     INDEX idx_ventas_tipo_entrega (tipo_entrega),
     INDEX idx_ventas_total (total)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
