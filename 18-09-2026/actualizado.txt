@@ -1,0 +1,620 @@
+-- ============================================================
+-- SISTEMA DE GESTION - POLLERIA DONA YACKI
+-- Base de datos: polleria_yacki
+-- Motor: InnoDB | Charset: utf8mb4 | Collation: utf8mb4_unicode_ci
+-- Compatibilidad: MySQL 8.0+
+-- ============================================================
+
+DROP DATABASE IF EXISTS polleria_yacki;
+CREATE DATABASE polleria_yacki;
+USE polleria_yacki;
+
+-- ============================================================
+-- TABLA: categorias
+-- ============================================================
+CREATE TABLE categorias (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(50) NOT NULL,
+    icono VARCHAR(50) DEFAULT NULL,
+    descripcion VARCHAR(255) DEFAULT NULL,
+    orden INT DEFAULT 0,
+    activo BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
+    INDEX idx_categorias_nombre (nombre),
+    INDEX idx_categorias_activo (activo),
+    INDEX idx_categorias_orden (orden)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: productos
+-- ============================================================
+CREATE TABLE productos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    categoria_id INT NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    precio DECIMAL(10,2) NOT NULL,
+    precio_compra DECIMAL(10,2) DEFAULT 0.00,
+    descripcion VARCHAR(255) DEFAULT NULL,
+    imagen VARCHAR(255) DEFAULT NULL,
+    stock INT DEFAULT 0,
+    stock_minimo INT DEFAULT 5,
+    unidad_medida VARCHAR(20) DEFAULT 'unidad',
+    disponible BOOLEAN DEFAULT TRUE,
+    agotado BOOLEAN DEFAULT FALSE,
+    destacado BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
+    FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE RESTRICT,
+
+    INDEX idx_productos_categoria (categoria_id),
+    INDEX idx_productos_nombre (nombre),
+    INDEX idx_productos_disponible (disponible),
+    INDEX idx_productos_agotado (agotado),
+    INDEX idx_productos_destacado (destacado),
+    INDEX idx_productos_precio (precio),
+    INDEX idx_productos_stock (stock)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: usuarios
+-- ============================================================
+CREATE TABLE usuarios (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) DEFAULT NULL,
+    dni VARCHAR(8) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE DEFAULT NULL,
+    telefono VARCHAR(15) DEFAULT NULL,
+    direccion VARCHAR(255) DEFAULT NULL,
+    rol ENUM('admin', 'cajero', 'mesero', 'cocinero', 'delivery') DEFAULT 'mesero',
+    password VARCHAR(255) NOT NULL,
+    foto VARCHAR(255) DEFAULT NULL,
+    fecha_contratacion DATE DEFAULT NULL,
+    salario DECIMAL(10,2) DEFAULT NULL,
+    activo BOOLEAN DEFAULT TRUE,
+    ultimo_acceso TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
+    INDEX idx_usuarios_dni (dni),
+    INDEX idx_usuarios_email (email),
+    INDEX idx_usuarios_rol (rol),
+    INDEX idx_usuarios_activo (activo),
+    INDEX idx_usuarios_nombre (nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
+ALTER TABLE historial_actividad
+  MODIFY COLUMN accion ENUM(
+    'login_exitoso',
+    'login_fallido',
+    'registro',
+    'registro_pendiente_verificacion',
+    'email_verificado',
+    'reenvio_codigo',
+    'logout',
+    'pedido_creado',
+    'pedido_completado',
+    'pedido_cancelado',
+    'navegacion'
+  ) NOT NULL;
+  
+  SHOW COLUMNS FROM historial_actividad LIKE 'accion';
+-- ============================================================
+-- TABLA: clientes (con campos de verificacion por correo)
+-- ============================================================
+CREATE TABLE clientes (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) DEFAULT NULL,
+    dni VARCHAR(8) UNIQUE DEFAULT NULL,
+    email VARCHAR(100) UNIQUE DEFAULT NULL,
+    password VARCHAR(255) NOT NULL,
+    telefono VARCHAR(15) DEFAULT NULL,
+    direccion VARCHAR(255) DEFAULT NULL,
+    tipo_cliente ENUM('regular', 'frecuente', 'vip') DEFAULT 'regular',
+    puntos INT DEFAULT 0,
+    activo BOOLEAN DEFAULT TRUE,
+    email_verificado BOOLEAN DEFAULT FALSE,
+    codigo_verificacion VARCHAR(10) DEFAULT NULL,
+    codigo_expira DATETIME DEFAULT NULL,
+    ultimo_acceso TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
+    INDEX idx_clientes_dni (dni),
+    INDEX idx_clientes_email (email),
+    INDEX idx_clientes_nombre (nombre),
+    INDEX idx_clientes_telefono (telefono),
+    INDEX idx_clientes_email_verificado (email_verificado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: mesas
+-- ============================================================
+CREATE TABLE mesas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    numero INT UNIQUE NOT NULL,
+    capacidad INT DEFAULT 4,
+    ubicacion VARCHAR(50) DEFAULT 'Sala Principal',
+    ocupada BOOLEAN DEFAULT FALSE,
+    cliente VARCHAR(100) DEFAULT NULL,
+    cantidad_personas INT DEFAULT 0,
+    hora_ocupacion TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
+    INDEX idx_mesas_numero (numero),
+    INDEX idx_mesas_ocupada (ocupada),
+    INDEX idx_mesas_ubicacion (ubicacion)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: pedidos
+-- ============================================================
+CREATE TABLE pedidos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    mesa_id INT DEFAULT NULL,
+    usuario_id INT NOT NULL,
+    cliente_id INT DEFAULT NULL,
+    cliente_nombre VARCHAR(100) DEFAULT NULL,
+    items JSON NOT NULL,
+    subtotal DECIMAL(10,2) DEFAULT 0.00,
+    igv DECIMAL(10,2) DEFAULT 0.00,
+    total DECIMAL(10,2) NOT NULL,
+    tipo ENUM('local', 'delivery', 'paraLlevar') DEFAULT 'local',
+    tipo_entrega ENUM('local', 'delivery', 'paraLlevar', 'motorizada') DEFAULT 'local',
+    estado ENUM('pendiente', 'preparando', 'listo', 'entregado', 'cancelado') DEFAULT 'pendiente',
+    metodo_pago ENUM('efectivo', 'tarjeta', 'yape', 'plin', 'transferencia') DEFAULT NULL,
+    pagado BOOLEAN DEFAULT FALSE,
+    fecha_pago TIMESTAMP NULL DEFAULT NULL,
+    observaciones TEXT DEFAULT NULL,
+    hora_inicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    hora_preparacion TIMESTAMP NULL DEFAULT NULL,
+    hora_entrega TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
+    FOREIGN KEY (mesa_id) REFERENCES mesas(id) ON DELETE SET NULL,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL,
+
+    INDEX idx_pedidos_mesa (mesa_id),
+    INDEX idx_pedidos_usuario (usuario_id),
+    INDEX idx_pedidos_cliente (cliente_id),
+    INDEX idx_pedidos_estado (estado),
+    INDEX idx_pedidos_fecha (created_at),
+    INDEX idx_pedidos_tipo (tipo),
+    INDEX idx_pedidos_pagado (pagado),
+    INDEX idx_pedidos_tipo_entrega (tipo_entrega),
+    INDEX idx_pedidos_fecha_pago (fecha_pago)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: pedidos_cliente
+-- ============================================================
+CREATE TABLE pedidos_cliente (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    cliente_id INT DEFAULT NULL,
+    cliente_nombre VARCHAR(100) NOT NULL,
+    cliente_telefono VARCHAR(15) DEFAULT NULL,
+    cliente_direccion VARCHAR(255) DEFAULT NULL,
+    cliente_referencia VARCHAR(255) DEFAULT NULL,
+    items JSON NOT NULL,
+    subtotal DECIMAL(10,2) DEFAULT 0.00,
+    igv DECIMAL(10,2) DEFAULT 0.00,
+    total DECIMAL(10,2) NOT NULL,
+    tipo_entrega ENUM('local', 'delivery', 'paraLlevar', 'motorizada') DEFAULT 'delivery',
+    metodo_pago ENUM('efectivo', 'tarjeta', 'yape', 'plin', 'transferencia') NOT NULL,
+    tipo_transferencia ENUM('qr', 'maquina') DEFAULT NULL,
+    comprobante_pago VARCHAR(255) DEFAULT NULL,
+    numero_operacion VARCHAR(50) DEFAULT NULL,
+    estado ENUM('pendiente', 'preparando', 'listo', 'entregado', 'cancelado') DEFAULT 'pendiente',
+    pagado BOOLEAN DEFAULT FALSE,
+    fecha_pago TIMESTAMP NULL DEFAULT NULL,
+    confirmado_por INT DEFAULT NULL,
+    fecha_confirmacion TIMESTAMP NULL DEFAULT NULL,
+    motivo_rechazo VARCHAR(255) DEFAULT NULL,
+    venta_id INT DEFAULT NULL,
+    observaciones TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
+    FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL,
+    FOREIGN KEY (confirmado_por) REFERENCES usuarios(id) ON DELETE SET NULL,
+
+    INDEX idx_pedidos_cliente_cliente (cliente_id),
+    INDEX idx_pedidos_cliente_estado (estado),
+    INDEX idx_pedidos_cliente_pagado (pagado),
+    INDEX idx_pedidos_cliente_fecha (created_at),
+    INDEX idx_pedidos_cliente_metodo (metodo_pago),
+    INDEX idx_pedidos_cliente_tipo (tipo_entrega),
+    INDEX idx_pedidos_cliente_transf (tipo_transferencia),
+    INDEX idx_pedidos_cliente_confirmado_por (confirmado_por),
+    INDEX idx_pedidos_cliente_venta (venta_id),
+    INDEX idx_pedidos_cliente_confirmacion (fecha_confirmacion)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: ventas
+-- REGLA DE ORO: un pedido_cliente solo puede tener UNA venta.
+-- El UNIQUE en pedido_cliente_id lo garantiza a nivel BD.
+-- ============================================================
+CREATE TABLE ventas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    pedido_id INT DEFAULT NULL,
+    pedido_cliente_id INT DEFAULT NULL,
+    usuario_id INT NOT NULL,
+    mesa_id INT DEFAULT NULL,
+    cliente_id INT DEFAULT NULL,
+    cliente_nombre VARCHAR(100) DEFAULT NULL,
+    items JSON NOT NULL,
+    subtotal DECIMAL(10,2) DEFAULT 0.00,
+    igv DECIMAL(10,2) DEFAULT 0.00,
+    descuento DECIMAL(10,2) DEFAULT 0.00,
+    total DECIMAL(10,2) NOT NULL,
+    metodo_pago ENUM('efectivo', 'tarjeta', 'yape', 'plin', 'transferencia') NOT NULL,
+    numero_operacion VARCHAR(50) DEFAULT NULL,
+    tipo_entrega ENUM('local', 'delivery', 'paraLlevar', 'motorizada') DEFAULT 'local',
+    origen ENUM('mesero', 'cajero', 'admin', 'pedido_web') DEFAULT 'mesero',
+    estado ENUM('completada', 'cancelada', 'pendiente') DEFAULT 'completada',
+    observaciones TEXT DEFAULT NULL,
+    fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
+    FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE SET NULL,
+    FOREIGN KEY (pedido_cliente_id) REFERENCES pedidos_cliente(id) ON DELETE SET NULL,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    FOREIGN KEY (mesa_id) REFERENCES mesas(id) ON DELETE SET NULL,
+    FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL,
+
+    UNIQUE KEY uq_ventas_pedido_cliente (pedido_cliente_id),
+
+    INDEX idx_ventas_usuario (usuario_id),
+    INDEX idx_ventas_pedido (pedido_id),
+    INDEX idx_ventas_pedido_cliente (pedido_cliente_id),
+    INDEX idx_ventas_mesa (mesa_id),
+    INDEX idx_ventas_cliente (cliente_id),
+    INDEX idx_ventas_fecha (fecha_venta),
+    INDEX idx_ventas_metodo_pago (metodo_pago),
+    INDEX idx_ventas_estado (estado),
+    INDEX idx_ventas_origen (origen),
+    INDEX idx_ventas_tipo_entrega (tipo_entrega),
+    INDEX idx_ventas_total (total),
+    INDEX idx_ventas_deleted (deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: historial_actividad
+-- CORREGIDO: el ENUM de 'accion' incluye los nuevos valores
+-- para verificacion por correo: 'registro_pendiente_verificacion'
+-- y 'email_verificado'. Tambien se agrego 'reenvio_codigo'.
+-- ============================================================
+CREATE TABLE historial_actividad (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    usuario_id INT DEFAULT NULL,
+    cliente_id INT DEFAULT NULL,
+    tipo_usuario ENUM('usuario', 'cliente', 'anonimo') DEFAULT 'usuario',
+    accion ENUM(
+        'login_exitoso',
+        'login_fallido',
+        'registro',
+        'registro_pendiente_verificacion',
+        'email_verificado',
+        'reenvio_codigo',
+        'logout',
+        'pedido_creado',
+        'pedido_completado',
+        'pedido_cancelado',
+        'navegacion'
+    ) NOT NULL,
+    descripcion VARCHAR(255) DEFAULT NULL,
+    ip VARCHAR(45) DEFAULT NULL,
+    user_agent TEXT DEFAULT NULL,
+    datos JSON DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL,
+
+    INDEX idx_hist_usuario (usuario_id),
+    INDEX idx_hist_cliente (cliente_id),
+    INDEX idx_hist_tipo (tipo_usuario),
+    INDEX idx_hist_accion (accion),
+    INDEX idx_hist_fecha (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: configuracion
+-- ============================================================
+CREATE TABLE configuracion (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    clave VARCHAR(50) UNIQUE NOT NULL,
+    valor TEXT DEFAULT NULL,
+    tipo ENUM('texto', 'numero', 'booleano', 'json') DEFAULT 'texto',
+    descripcion VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+
+    INDEX idx_configuracion_clave (clave),
+    INDEX idx_configuracion_tipo (tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: logs
+-- ============================================================
+CREATE TABLE logs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    usuario_id INT DEFAULT NULL,
+    accion VARCHAR(100) NOT NULL,
+    tabla VARCHAR(50) DEFAULT NULL,
+    registro_id INT DEFAULT NULL,
+    datos_anteriores JSON DEFAULT NULL,
+    datos_nuevos JSON DEFAULT NULL,
+    ip VARCHAR(45) DEFAULT NULL,
+    user_agent TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+
+    INDEX idx_logs_usuario (usuario_id),
+    INDEX idx_logs_accion (accion),
+    INDEX idx_logs_tabla (tabla),
+    INDEX idx_logs_fecha (created_at),
+    INDEX idx_logs_registro (tabla, registro_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: historial_precios
+-- ============================================================
+CREATE TABLE historial_precios (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    producto_id INT NOT NULL,
+    producto_nombre VARCHAR(100) NOT NULL,
+    usuario_id INT DEFAULT NULL,
+    usuario_nombre VARCHAR(150) DEFAULT NULL,
+    precio_anterior DECIMAL(10,2) NOT NULL,
+    precio_nuevo DECIMAL(10,2) NOT NULL,
+    diferencia DECIMAL(10,2) AS (precio_nuevo - precio_anterior) STORED,
+    porcentaje_cambio DECIMAL(6,2) AS (
+        CASE
+            WHEN precio_anterior > 0
+            THEN ROUND(((precio_nuevo - precio_anterior) / precio_anterior) * 100, 2)
+            ELSE 0
+        END
+    ) STORED,
+    motivo VARCHAR(255) DEFAULT NULL,
+    ip VARCHAR(45) DEFAULT NULL,
+    user_agent TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+
+    INDEX idx_hist_precio_producto (producto_id),
+    INDEX idx_hist_precio_usuario (usuario_id),
+    INDEX idx_hist_precio_fecha (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- TABLA: tokens_blacklist
+-- ============================================================
+CREATE TABLE tokens_blacklist (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    token VARCHAR(500) NOT NULL,
+    usuario_id INT DEFAULT NULL,
+    expiracion TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+
+    INDEX idx_tokens_token (token(255)),
+    INDEX idx_tokens_usuario (usuario_id),
+    INDEX idx_tokens_expiracion (expiracion)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- DATOS INICIALES
+-- ============================================================
+
+INSERT INTO configuracion (clave, valor, tipo, descripcion) VALUES
+('EMPRESA_NOMBRE', 'Dona Yacki', 'texto', 'Nombre de la empresa'),
+('EMPRESA_RUC', '12345678901', 'texto', 'RUC de la empresa'),
+('EMPRESA_DIRECCION', 'Mz M2 Lt 33, Jardines de Chillon', 'texto', 'Direccion de la empresa'),
+('EMPRESA_TELEFONO', '902458936', 'texto', 'Telefono de contacto'),
+('IGV', '18', 'numero', 'Porcentaje de IGV'),
+('INSTAGRAM', '@donayacki_oficial', 'texto', 'Instagram'),
+('FACEBOOK', '@donayacki', 'texto', 'Facebook'),
+('TIKTOK', '@donayacki', 'texto', 'TikTok'),
+('DELIVERY_TELEFONO', '902458936', 'texto', 'Telefono para delivery'),
+('HORARIO_APERTURA', '10:00', 'texto', 'Hora de apertura'),
+('HORARIO_CIERRE', '22:00', 'texto', 'Hora de cierre'),
+('DIAS_LABORALES', '["Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"]', 'json', 'Dias de atencion'),
+('MESAS_ACTIVAS', '10', 'numero', 'Numero de mesas activas'),
+('TIEMPO_ESTIMADO_PREPARACION', '30', 'numero', 'Tiempo estimado de preparacion en minutos'),
+('MAXIMO_PEDIDOS_MESA', '3', 'numero', 'Maximo de pedidos por mesa'),
+('PERMITE_CANCELAR_PEDIDOS', 'true', 'booleano', 'Permite cancelar pedidos despues de preparacion');
+
+INSERT INTO categorias (nombre, icono, descripcion, orden, activo) VALUES
+('Brasas', NULL, 'Pollos a la brasa', 1, 1),
+('Broasters', NULL, 'Pollos broaster', 2, 1),
+('Mostro Brasa', NULL, 'Mostros a la brasa', 3, 1),
+('Mostro Broaster', NULL, 'Mostros broaster', 4, 1),
+('Piezas de Pollo', NULL, 'Piezas y combos', 5, 1),
+('Alitas', NULL, 'Combos de alitas', 6, 1),
+('Salchipapas', NULL, 'Salchipapas y combinados', 7, 1),
+('Hamburguesas', NULL, 'Hamburguesas', 8, 1),
+('Don Menu', NULL, 'Menus ejecutivos', 9, 1),
+('Adicionales', NULL, 'Acompanamientos', 10, 1),
+('Chifa y Plancha', NULL, 'Platos chifa y plancha', 11, 1),
+('Promos Brasa', NULL, 'Promociones especiales', 12, 1),
+('Gaseosas', NULL, 'Bebidas gaseosas', 13, 1),
+('Cervezas', NULL, 'Cervezas artesanales', 14, 1),
+('Aguas', NULL, 'Agua mineral', 15, 1),
+('Infusiones', NULL, 'Tes e infusiones', 16, 1),
+('Pepsi', NULL, 'Linea Pepsi', 17, 1),
+('Chicha/Maracuya', NULL, 'Bebidas tradicionales', 18, 1);
+
+-- Productos: Brasas
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado, destacado) VALUES
+(1, '1/4 de pollo', 12.00, 8.00, 'Cuarto de pollo a la brasa con papas fritas y ensalada', 50, 10, 1, 0, 1),
+(1, '1/2 pollo', 23.00, 15.00, 'Medio pollo a la brasa con papas fritas y ensalada', 50, 10, 1, 0, 1),
+(1, '1 pollo', 45.00, 30.00, 'Pollo entero a la brasa con papas fritas y ensalada', 50, 10, 1, 0, 1);
+
+-- Productos: Broasters
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(2, 'Ala broaster', 10.00, 6.00, 'Ala broaster crujiente con papas fritas', 50, 10, 1, 0),
+(2, 'Pierna broaster', 11.00, 7.00, 'Pierna broaster crujiente con papas fritas', 50, 10, 1, 0),
+(2, 'Encuentro broaster', 12.00, 8.00, 'Encuentro broaster crujiente con papas fritas', 50, 10, 1, 0),
+(2, 'Pecho broaster', 13.00, 9.00, 'Pecho broaster crujiente con papas fritas', 50, 10, 1, 0);
+
+-- Productos: Mostro Brasa
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado, destacado) VALUES
+(3, 'Mostrito', 11.00, 7.00, '1/8 de pollo, arroz chaufa, papas fritas y ensalada', 40, 8, 1, 0, 1),
+(3, 'Mostro', 16.00, 10.00, '1/4 de pollo, arroz chaufa, papas fritas y ensalada', 40, 8, 1, 0, 1),
+(3, 'Super Mostro', 19.00, 12.00, '1/4 de pollo, arroz chaufa, papas fritas, ensalada y gaseosa 500ml', 40, 8, 1, 0, 1);
+
+-- Productos: Mostro Broaster
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(4, 'Mostro Ala', 13.00, 8.00, 'Ala broaster, arroz chaufa, papas fritas y ensalada', 40, 8, 1, 0),
+(4, 'Mostro Pierna', 14.00, 9.00, 'Pierna broaster, arroz chaufa, papas fritas y ensalada', 40, 8, 1, 0),
+(4, 'Mostro Encuentro', 15.00, 10.00, 'Encuentro broaster, arroz chaufa, papas fritas y ensalada', 40, 8, 1, 0),
+(4, 'Mostro Pecho', 16.00, 11.00, 'Pecho broaster, arroz chaufa, papas fritas y ensalada', 40, 8, 1, 0);
+
+-- Productos: Piezas de Pollo
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(5, '2 piezas + papas', 14.00, 9.00, '2 piezas de pollo con papas fritas', 30, 5, 1, 0),
+(5, '4 piezas + papas', 27.00, 18.00, '4 piezas de pollo con papas fritas', 30, 5, 1, 0),
+(5, '6 piezas + papas', 38.00, 25.00, '6 piezas de pollo con papas fritas', 30, 5, 1, 0),
+(5, '10 piezas + papas', 54.00, 36.00, '10 piezas de pollo con papas fritas', 30, 5, 1, 0);
+
+-- Productos: Alitas
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(6, '6 Alitas + Papas', 18.00, 12.00, '6 alitas con papas fritas y salsa', 30, 5, 1, 0),
+(6, '12 Alitas + Papas', 32.00, 21.00, '12 alitas con papas fritas y salsa', 30, 5, 1, 0),
+(6, '24 Alitas + Papas', 58.00, 38.00, '24 alitas con papas fritas y salsa', 30, 5, 1, 0);
+
+-- Productos: Salchipapas
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(7, 'Salchipapa Clasica', 10.00, 6.00, 'Salchicha con papas fritas', 40, 8, 1, 0),
+(7, 'Salchipapa Especial', 14.00, 9.00, 'Salchicha, huevo frito y papas fritas', 40, 8, 1, 0),
+(7, 'Salchipapa con Pollo', 16.00, 10.00, 'Salchicha, pollo deshilachado y papas fritas', 40, 8, 1, 0);
+
+-- Productos: Hamburguesas
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(8, 'Hamburguesa Simple', 10.00, 6.00, 'Hamburguesa con lechuga, tomate y papas', 40, 8, 1, 0),
+(8, 'Hamburguesa con Queso', 13.00, 8.00, 'Hamburguesa con queso derretido, lechuga y tomate', 40, 8, 1, 0),
+(8, 'Hamburguesa Royal', 16.00, 10.00, 'Hamburguesa con queso, bacon, huevo y papas', 40, 8, 1, 0);
+
+-- Productos: Don Menu
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado, destacado) VALUES
+(9, 'Menu Ejecutivo', 15.00, 10.00, 'Pollo a la brasa, arroz, papas fritas y ensalada', 30, 5, 1, 0, 1),
+(9, 'Menu Especial', 18.00, 12.00, 'Pollo a la brasa, arroz chaufa, papas fritas y ensalada', 30, 5, 1, 0, 1);
+
+-- Productos: Adicionales
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(10, 'Papas Fritas', 5.00, 3.00, 'Papas fritas crujientes', 50, 10, 1, 0),
+(10, 'Ensalada Mixta', 4.00, 2.00, 'Ensalada fresca con lechuga, tomate y cebolla', 50, 10, 1, 0),
+(10, 'Arroz Chaufa', 6.00, 4.00, 'Arroz chaufa con pollo y huevo', 50, 10, 1, 0),
+(10, 'Salsa de la Casa', 2.00, 1.00, 'Salsa especial de la casa', 50, 10, 1, 0);
+
+-- Productos: Chifa y Plancha
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(11, 'Chaufa de Pollo', 12.00, 8.00, 'Arroz chaufa con pollo y huevo', 30, 5, 1, 0),
+(11, 'Chaufa Especial', 15.00, 10.00, 'Arroz chaufa con pollo, cerdo y huevo', 30, 5, 1, 0),
+(11, 'Tallarin Saltado', 14.00, 9.00, 'Tallarin saltado con pollo y verduras', 30, 5, 1, 0);
+
+-- Productos: Promos Brasa
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado, destacado) VALUES
+(12, 'Promo Familiar', 55.00, 36.00, '1 pollo entero, papas fritas y 2 gaseosas 500ml', 20, 4, 1, 0, 1),
+(12, 'Promo Pareja', 35.00, 23.00, '1/2 pollo, papas fritas y 2 gaseosas 500ml', 20, 4, 1, 0, 1),
+(12, 'Promo Mega', 75.00, 50.00, '1 pollo entero, 12 alitas, papas fritas y 4 gaseosas 500ml', 20, 4, 1, 0, 1);
+
+-- Productos: Gaseosas
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(13, 'Coca Cola 500ml', 4.00, 2.50, 'Coca Cola 500ml', 50, 10, 1, 0),
+(13, 'Inca Kola 500ml', 4.00, 2.50, 'Inca Kola 500ml', 50, 10, 1, 0),
+(13, 'Coca Cola 1.5L', 7.00, 4.50, 'Coca Cola 1.5 litros', 50, 10, 1, 0),
+(13, 'Inca Kola 1.5L', 7.00, 4.50, 'Inca Kola 1.5 litros', 50, 10, 1, 0);
+
+-- Productos: Cervezas
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(14, 'Cerveza Cristal 330ml', 5.00, 3.00, 'Cerveza Cristal 330ml', 50, 10, 1, 0),
+(14, 'Cerveza Pilsen 330ml', 5.00, 3.00, 'Cerveza Pilsen 330ml', 50, 10, 1, 0),
+(14, 'Cerveza Cristal 620ml', 8.00, 5.00, 'Cerveza Cristal 620ml', 50, 10, 1, 0),
+(14, 'Cerveza Pilsen 620ml', 8.00, 5.00, 'Cerveza Pilsen 620ml', 50, 10, 1, 0);
+
+-- Productos: Aguas
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(15, 'Agua Mineral 500ml', 3.00, 1.50, 'Agua mineral 500ml', 50, 10, 1, 0),
+(15, 'Agua Mineral 1.5L', 5.00, 3.00, 'Agua mineral 1.5 litros', 50, 10, 1, 0),
+(15, 'Agua con Gas 500ml', 3.50, 2.00, 'Agua con gas 500ml', 50, 10, 1, 0);
+
+-- Productos: Infusiones
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(16, 'Te de Hierbas', 3.00, 1.50, 'Te de hierbas caliente', 30, 5, 1, 0),
+(16, 'Manzanilla', 3.00, 1.50, 'Infusion de manzanilla caliente', 30, 5, 1, 0),
+(16, 'Te Negro', 3.00, 1.50, 'Te negro caliente', 30, 5, 1, 0);
+
+-- Productos: Pepsi
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(17, 'Pepsi 500ml', 4.00, 2.50, 'Pepsi 500ml', 50, 10, 1, 0),
+(17, 'Pepsi 1.5L', 7.00, 4.50, 'Pepsi 1.5 litros', 50, 10, 1, 0),
+(17, 'Pepsi Black 500ml', 4.50, 3.00, 'Pepsi Black 500ml', 50, 10, 1, 0);
+
+-- Productos: Chicha / Maracuya
+INSERT INTO productos (categoria_id, nombre, precio, precio_compra, descripcion, stock, stock_minimo, disponible, agotado) VALUES
+(18, 'Chicha Morada 500ml', 4.00, 2.50, 'Chicha morada 500ml', 30, 5, 1, 0),
+(18, 'Jugo de Maracuya 500ml', 4.00, 2.50, 'Jugo de maracuya 500ml', 30, 5, 1, 0),
+(18, 'Chicha Morada 1L', 7.00, 4.50, 'Chicha morada 1 litro', 30, 5, 1, 0);
+
+-- Usuarios del sistema (contrasena: 123456 con bcrypt)
+INSERT INTO usuarios (nombre, apellido, dni, email, telefono, rol, password, fecha_contratacion, salario, activo) VALUES
+('Admin', 'Sistema', '12345678', 'admin@polleriayacky.com', '902458936', 'admin', '$2a$10$N9qo8uLOickgx2ZMRZoMy.Mr/.3dF7Z4nYkZr4Z8W8dKwKxqVK5Fq', '2024-01-01', 3500.00, 1),
+('Cajero', 'Sistema', '87654321', 'cajero@polleriayacky.com', '902458937', 'cajero', '$2a$10$N9qo8uLOickgx2ZMRZoMy.Mr/.3dF7Z4nYkZr4Z8W8dKwKxqVK5Fq', '2024-01-01', 2800.00, 1),
+('Mesero', 'Sistema', '11111111', 'mesero@polleriayacky.com', '902458938', 'mesero', '$2a$10$N9qo8uLOickgx2ZMRZoMy.Mr/.3dF7Z4nYkZr4Z8W8dKwKxqVK5Fq', '2024-01-01', 2500.00, 1);
+
+-- Cliente de prueba (contrasena: 123456 con bcrypt) - ya verificado
+INSERT INTO clientes (nombre, apellido, email, password, telefono, direccion, tipo_cliente, puntos, activo, email_verificado) VALUES
+('Cliente', 'Prueba', 'cliente@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMy.Mr/.3dF7Z4nYkZr4Z8W8dKwKxqVK5Fq', '987654321', 'Av. Prueba 123', 'regular', 0, 1, 1);
+
+-- Mesas
+INSERT INTO mesas (numero, capacidad, ubicacion) VALUES
+(1, 4, 'Sala Principal'),
+(2, 4, 'Sala Principal'),
+(3, 4, 'Sala Principal'),
+(4, 6, 'Sala Principal'),
+(5, 6, 'Sala Principal'),
+(6, 4, 'Terraza'),
+(7, 4, 'Terraza'),
+(8, 4, 'Terraza'),
+(9, 6, 'VIP'),
+(10, 8, 'VIP');
+
+-- ============================================================
+-- VERIFICACION FINAL
+-- ============================================================
+SELECT 'Base de datos creada correctamente' AS status;
+SELECT COUNT(*) AS total_categorias FROM categorias;
+SELECT COUNT(*) AS total_productos FROM productos;
+SELECT COUNT(*) AS total_usuarios FROM usuarios;
+SELECT COUNT(*) AS total_clientes FROM clientes;
+SELECT COUNT(*) AS total_mesas FROM mesas;
+SELECT COUNT(*) AS total_pedidos FROM pedidos;
+SELECT COUNT(*) AS total_pedidos_cliente FROM pedidos_cliente;
+SELECT COUNT(*) AS total_ventas FROM ventas;
+SELECT COUNT(*) AS total_historial_precios FROM historial_precios;
